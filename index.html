@@ -1,0 +1,208 @@
+<html>
+    <title>Cat Smash</title>
+<head>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.7.16.min.js"></script>
+<!--jquery cdn-->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+<!--bootstrap cdns-->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+    <style>
+      		
+      		#catMePic {
+      		  width:350px;
+      		  height:350px;
+      		}
+      		
+      		#catYouPic {
+      		  width:350px;
+      		  height:350px;
+      		}
+
+    </style>
+
+
+<script>
+/*global AWS*/
+/*global $*/ 
+
+var catScores = [];
+
+// The parameters required to intialize the Cognito Credentials object.
+// If you are authenticating your users through one of the supported
+// identity providers you should set the Logins object with the provider
+// tokens. For example:
+// Logins: {
+//   graph.facebook.com : facebookResponse.authResponse.accessToken
+// }
+var params = {
+	IdentityPoolId: "us-east-1:ee02cf99-6069-4cc4-913d-d0c596740dcf"
+};
+
+// set the Amazon Cognito region
+AWS.config.region = 'us-east-1';
+// initialize the Credentials object with our parameters
+AWS.config.credentials = new AWS.CognitoIdentityCredentials(params);
+
+// We can set the get method of the Credentials object to retrieve
+// the unique identifier for the end user (identityId) once the provider
+// has refreshed itself
+AWS.config.credentials.get(function(err) {
+	if (err) {
+		console.log("Error: "+err);
+		return;
+	}
+	console.log("Cognito Identity Id: " + AWS.config.credentials.identityId);
+
+	// Other service clients will automatically use the Cognito Credentials provider
+	// configured in the JavaScript SDK.
+	var cognitoSyncClient = new AWS.CognitoSync();
+	cognitoSyncClient.listDatasets({
+		IdentityId: AWS.config.credentials.identityId,
+		IdentityPoolId: "us-east-1:ee02cf99-6069-4cc4-913d-d0c596740dcf"
+	}, function(err, data) {
+		if ( !err ) {
+			console.log(JSON.stringify(data));
+		}
+	});
+});
+
+
+
+// AWS.config.region = 'us-east-1'; // Region
+
+// AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+//     IdentityPoolId: 'us-east-1:ee02cf99-6069-4cc4-913d-d0c596740dcf',
+// });
+
+var table = "CatScores";
+var docClient = new AWS.DynamoDB.DocumentClient();
+
+function increaseRating(catid) {
+
+    var CatId = catid.toString();
+    CatId.toString();
+    //console.log("is number"+ isNaN(CatId));
+    var params = {
+        TableName:table,
+        Key:{
+            "CatId": CatId
+        },
+        UpdateExpression: "set Score = Score + :val",
+        ExpressionAttributeValues:{
+            ":val":1
+        },
+        ReturnValues:"UPDATED_NEW"
+    };
+    
+    docClient.update(params, doIncreaseRating);
+    function doIncreaseRating(err, data) {
+        if (err) {
+            console.log(JSON.stringify(err, undefined, 2));
+        } else {
+            console.log("Cat with id: " + CatId + " score added 1");
+        }
+    }
+}
+
+
+function scanData() {
+    var params = {
+        TableName: table,
+        ProjectionExpression: "CatId, Score"
+    };
+    docClient.scan(params, onScan);
+    function onScan(err, data) {
+        
+        if (err) {
+            console.log(err);
+        } else {
+            console.log("scan success");
+            data.Items.forEach(function(cat) {
+                console.log("cat data: "+ JSON.stringify(cat));
+                catScores[cat.CatId] = cat.Score;
+            });
+            alert(JSON.stringify(catScores));
+        }
+    }
+}
+
+
+//--------------------------------------END DYNAMODB NOSQL DATABASE
+
+      var myVar
+      var result1;
+      var result2;
+
+      var result1Holder;
+      var result2Holder;
+      
+
+      function popCats(){
+          
+        do{
+            result1 = Math.floor((Math.random() * 21));
+            result2 = Math.floor((Math.random() * 21)); 
+        }while(result1 == result2);
+   
+        $("#catMePic").attr("src", "https://s3.amazonaws.com/catsmash/img/"+ result1 +".jpg");///img/
+        $("#catYouPic").attr("src", "https://s3.amazonaws.com/catsmash/img/"+ result2 +".jpg");
+
+      }
+       
+      function clearMe(){
+        $("#catMePic").attr("src", "");
+        $("#catYouPic").attr("src", "");
+      }
+      
+       $(document).ready(function() {
+          
+         popCats();
+            
+           $('#catMePic').click(function() {
+                  increaseRating(result1);
+                  clearMe();
+                  popCats();
+            });
+            
+            $('#catYouPic').click(function() {
+                increaseRating(result2);
+                clearMe();
+                popCats();
+            });
+            
+            $('#catStats').click(function() {
+                scanData();
+            });
+            
+
+        });
+            
+
+</script>
+</head>
+
+<body>
+<div class="container-fluid"  align="center">
+<div class="row">    
+    <h1>Hot or Not / Face Smash, but with Cats</h1>
+    <button id="catStats" type="button" class="btn btn-primary">Cat Stats</button>
+</div>
+
+<div class="row" >
+<div id="clearMe" >
+        
+      <div id="catMe" class="col-md-3 col-md-offset-3"  >
+          <img name="catMePic" id="catMePic" src="" />
+      </div>
+      <div id="catYou" class="col-md-3" >
+          <img name="catYouPic" id="catYouPic" src="" />
+       </div>
+
+</div>
+</div>
+</div>
+</body>
+</html>
